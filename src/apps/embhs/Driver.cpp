@@ -9,7 +9,6 @@
 #include "MNPuzzleHash.h"
 #include "TemplateAStar.h"
 #include "STPInstances.h"
-#include "PancakeInstances.h"
 #include "IDAStar.h"
 #include "BAE.h"
 #include "EMBHS.h"
@@ -92,6 +91,9 @@ const int ARIEL_OPTIMAL_SOLUTIONS[50] = {95, 96, 97, 98, 100, 101, 104, 108, 113
                                          99, 97, 106, 102, 98, 90, 100, 96, 104, 82,
                                          106, 108, 104, 93, 101, 100, 92, 107, 100, 113};
 //</editor-fold>
+
+
+
 
 
 template<class Tstate, class Taction, class Tenvironment, class Thash>
@@ -546,7 +548,6 @@ int main(int argc, char *argv[]) {
     EMBHS::Verbosity verbosity = EMBHS::lInfo;
     int korf_instance = -1;
     int ariel_instance = -1;
-    int pancake_instance = -1;
     std::string algorithm = "PEBAE";
     std::string pdb_path;
     std::string pebae_path = "pebae_files/";
@@ -674,7 +675,7 @@ int main(int argc, char *argv[]) {
     }
 
     if ((!(ariel_instance + 1) + !(korf_instance + 1)) != 1) {
-        std::cerr << ariel_instance << " " << korf_instance << " " << pancake_instance << std::endl;
+        std::cerr << ariel_instance << " " << korf_instance << " " << std::endl;
         std::cerr << "Choose exactly one type of problem" << std::endl;
         exit(-1);
     }

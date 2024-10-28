@@ -4,7 +4,6 @@
 #include <vector>
 #include "MNPuzzle.h"
 #include "LexPermutationPDB.h"
-#include "PancakePuzzle.h"
 
 namespace EMBHS {
     enum Verbosity {
@@ -14,21 +13,6 @@ namespace EMBHS {
         lWarn = 30,
         lError = 40,
         lCritical = 50
-    };
-
-    template<int N>
-    class StoredGapHeuristic : public Heuristic<PancakePuzzleState<N>> {
-    public:
-        StoredGapHeuristic(PancakePuzzleState<N> goal) {
-            env.StoreGoal(goal);
-        }
-
-        double HCost(const PancakePuzzleState<N> &a, const PancakePuzzleState<N> &b) const override {
-            return env.HCost(a);
-        }
-
-    protected:
-        PancakePuzzle<N> env;
     };
 }
 
