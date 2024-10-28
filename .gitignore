@@ -1,0 +1,17 @@
+# Raw and final data
+data/
+pdbs/
+results/
+temp/
+
+# Compiled objects
+src/bin/
+src/objs/
+
+# CLion
+.idea/
+cmake-build-debug/
+CMakeLists.txt
+
+# Virtual env
+wvenv/
