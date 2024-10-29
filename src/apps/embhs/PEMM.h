@@ -7,7 +7,6 @@
 
 #include "Heuristic.h"
 #include "Timer.h"
-#include "EMBHS.h"
 #include <limits>
 #include <mutex>
 #include <unordered_map>

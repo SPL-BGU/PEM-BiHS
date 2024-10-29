@@ -8,7 +8,7 @@
 #include "Heuristic.h"
 #include "FixedSizeSetMultiThreaded.h"
 #include "Timer.h"
-#include "EMBHS.h"
+#include "Utils.h"
 #include <limits>
 #include <mutex>
 #include <unordered_map>

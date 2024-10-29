@@ -8,7 +8,6 @@
 #include <map>
 #include <cmath>
 #include <iostream>
-#include "EMBHS.h"
 
 namespace EMBHS { namespace BAE {
     template<class state>

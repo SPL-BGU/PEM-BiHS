@@ -1,22 +1,19 @@
+#include <ios>
 #include <iostream>
-#include <numeric>
+#include <iomanip>
+#include <vector>
+#include "Utils.h"
 #include "MNPuzzle.h"
-#include "SearchEnvironment.h"
-#include "LexPermutationPDB.h"
+#include "STPInstances.h"
+#include "PatternDatabases.h"
+#include "BAE.h"
+#include "TemplateAStar.h"
+#include "IDAStar.h"
+#include "ParallelIDAStar.h"
 #include "PEBAE.h"
 #include "PEMM.h"
 #include "PEMASTAR.h"
-#include "MNPuzzleHash.h"
-#include "TemplateAStar.h"
-#include "STPInstances.h"
-#include "IDAStar.h"
-#include "BAE.h"
-#include "EMBHS.h"
 #include <sys/stat.h>
-#include "PatternDatabases.h"
-#include "ParallelIDAStar.h"
-#include "TOH.h"
-#include "TOHHash.h"
 
 #define RUN_PROBLEM_STP(x) RunProblem<MNPuzzleState<x, x>, slideDir, MNPuzzle<x, x>, EMBHS::STPHash<x>>
 
@@ -92,215 +89,17 @@ const int ARIEL_OPTIMAL_SOLUTIONS[50] = {95, 96, 97, 98, 100, 101, 104, 108, 113
                                          106, 108, 104, 93, 101, 100, 92, 107, 100, 113};
 //</editor-fold>
 
-
-
-
-
-template<class Tstate, class Taction, class Tenvironment, class Thash>
-int RunProblem(Tstate start, Tstate goal,
-               Heuristic<Tstate> *hForward, Heuristic<Tstate> *hBackward,
-               EMBHS::Verbosity verbosity, const std::string &algorithm, const std::string &pebae_prefix,
-               int numThreadsExpansion, int numThreadsReading) {
-
-    int solutionCost = -1;
-    uint64_t nodesExpanded = 0;
-    uint64_t necessaryExpanded = 0;
-    uint64_t lastBucketSize = 0;
-    uint64_t nodesGenerated = 0;
-    size_t maxMemory = 0;
-    Tenvironment env;
-    std::vector<Tstate> solutionPath;
-    Timer t;
-
-    if (algorithm == "PEBAE") {
-        // Clear and make the directory to store all the PE-BAE* files
-        system(("rm -rf " + pebae_prefix).c_str());
-        system(("mkdir " + pebae_prefix).c_str());
-        EMBHS::PEBAE::PEBAE<Tstate, Taction, Tenvironment, Thash> pebae(pebae_prefix, verbosity, numThreadsExpansion,
-                                                                        numThreadsReading);
-        pebae.SetHeuristics(hForward, hBackward);
-
-        t.StartTimer();
-        pebae.GetPath(start, goal);
-        t.EndTimer();
-
-        solutionCost = pebae.GetPathLength();
-        nodesExpanded = pebae.GetNodesExpanded();
-        necessaryExpanded = pebae.GetNecessaryExpanded();
-        lastBucketSize = pebae.GetLastBucketSize();
-        nodesGenerated = pebae.GetNodesGenerated();
-        maxMemory = pebae.GetMaxMemory();
-
-    } else if (algorithm == "PEMM") {
-        // Clear and make the directory to store all the PE-BAE* files
-        system(("rm -rf " + pebae_prefix).c_str());
-        system(("mkdir " + pebae_prefix).c_str());
-        EMBHS::PEMM::PEMM<Tstate, Taction, Tenvironment, Thash> pemm(pebae_prefix, verbosity);
-        pemm.SetHeuristics(hForward, hBackward);
-
-        t.StartTimer();
-        pemm.GetPath(start, goal);
-        t.EndTimer();
-
-        solutionCost = pemm.GetPathLength();
-        nodesExpanded = pemm.GetNodesExpanded();
-        necessaryExpanded = pemm.GetNecessaryExpanded();
-        lastBucketSize = pemm.GetLastBucketSize();
-        nodesGenerated = pemm.GetNodesGenerated();
-
-    } else if (algorithm == "PEMASTAR") {
-        // Clear and make the directory to store all the PE-BAE* files
-        system(("rm -rf " + pebae_prefix).c_str());
-        system(("mkdir " + pebae_prefix).c_str());
-        EMBHS::PEMASTAR::PEMASTAR<Tstate, Taction, Tenvironment, Thash> pemastar(
-                pebae_prefix,
-                verbosity);
-        pemastar.SetHeuristics(hForward);
-
-        t.StartTimer();
-        pemastar.GetPath(start, goal);
-        t.EndTimer();
-
-        solutionCost = pemastar.GetPathLength();
-        nodesExpanded = pemastar.GetNodesExpanded();
-        necessaryExpanded = pemastar.GetNecessaryExpanded();
-        lastBucketSize = pemastar.GetLastBucketSize();
-        nodesGenerated = pemastar.GetNodesGenerated();
-
-    } else if (algorithm == "RPEMASTAR") {
-        // Clear and make the directory to store all the PE-BAE* files
-        system(("rm -rf " + pebae_prefix).c_str());
-        system(("mkdir " + pebae_prefix).c_str());
-        EMBHS::PEMASTAR::PEMASTAR<Tstate, Taction, Tenvironment, Thash> pemastar(
-                pebae_prefix,
-                verbosity);
-        pemastar.SetHeuristics(hBackward);
-
-        t.StartTimer();
-        pemastar.GetPath(goal, start);
-        t.EndTimer();
-
-        solutionCost = pemastar.GetPathLength();
-        nodesExpanded = pemastar.GetNodesExpanded();
-        necessaryExpanded = pemastar.GetNecessaryExpanded();
-        lastBucketSize = pemastar.GetLastBucketSize();
-        nodesGenerated = pemastar.GetNodesGenerated();
-
-    } else if (algorithm == "A") {
-        TemplateAStar<Tstate, Taction, Tenvironment> astar;
-        if (hForward != nullptr)
-            astar.SetHeuristic(hForward);
-
-        t.StartTimer();
-        astar.GetPath(&env, start, goal, solutionPath);
-        t.EndTimer();
-
-        solutionCost = env.GetPathLength(solutionPath);
-        nodesExpanded = astar.GetNodesExpanded();
-
-    } else if (algorithm == "RA") {
-        TemplateAStar<Tstate, Taction, Tenvironment> astar;
-        if (hBackward != nullptr)
-            astar.SetHeuristic(hBackward);
-
-        t.StartTimer();
-        astar.GetPath(&env, goal, start, solutionPath);
-        t.EndTimer();
-
-        solutionCost = env.GetPathLength(solutionPath);
-        nodesExpanded = astar.GetNodesExpanded();
-
-    } else if (algorithm == "IDA") {
-        IDAStar<Tstate, Taction> idastar;
-        if (hForward != nullptr)
-            idastar.SetHeuristic(hForward);
-
-        t.StartTimer();
-        idastar.GetPath(&env, start, goal, solutionPath);
-        t.EndTimer();
-
-        solutionCost = env.GetPathLength(solutionPath);
-        nodesExpanded = idastar.GetNodesExpanded();
-        nodesGenerated = idastar.GetNodesTouched();
-    } else if (algorithm == "RIDA") {
-        IDAStar<Tstate, Taction> idastar;
-        if (hBackward != nullptr)
-            idastar.SetHeuristic(hBackward);
-
-        t.StartTimer();
-        idastar.GetPath(&env, goal, start, solutionPath);
-        t.EndTimer();
-
-        solutionCost = env.GetPathLength(solutionPath);
-        nodesExpanded = idastar.GetNodesExpanded();
-        nodesGenerated = idastar.GetNodesTouched();
-    } else if (algorithm == "BAE") {
-        EMBHS::BAE::BAE<Tstate, Taction, Tenvironment> bae;
-        if (hForward == nullptr)
-            hForward = &env;
-        if (hBackward == nullptr)
-            hBackward = &env;
-
-        t.StartTimer();
-        bae.GetPath(&env, start, goal, hForward, hBackward, solutionPath);
-        t.EndTimer();
-
-        solutionCost = env.GetPathLength(solutionPath);
-        nodesExpanded = bae.GetNodesExpanded();
-    } else if (algorithm == "PIDA") {
-        ParallelIDAStar<Tenvironment, Tstate, Taction> ida;
-        if (hForward == nullptr)
-            hForward = &env;
-        std::vector<Taction> actionSolutionPath;
-        ida.SetHeuristic(hForward);
-        t.StartTimer();
-        ida.GetPath(&env, start, goal, actionSolutionPath);
-        t.EndTimer();
-
-        //Since STP is a unit-cost domain, the path length is the number of actions taken
-        solutionCost = (int) actionSolutionPath.size();
-        nodesExpanded = ida.GetNodesExpanded();
-        necessaryExpanded = ida.GetNecessaryExpanded();
-        nodesGenerated = ida.GetNodesTouched();
-    } else if (algorithm == "RPIDA") {
-        ParallelIDAStar<Tenvironment, Tstate, Taction> ida;
-        if (hBackward == nullptr)
-            hBackward = &env;
-        std::vector<Taction> actionSolutionPath;
-        ida.SetHeuristic(hBackward);
-        t.StartTimer();
-        ida.GetPath(&env, goal, start, actionSolutionPath);
-        t.EndTimer();
-
-        //Since STP is a unit-cost domain, the path length is the number of actions taken
-        solutionCost = (int) actionSolutionPath.size();
-        nodesExpanded = ida.GetNodesExpanded();
-        necessaryExpanded = ida.GetNecessaryExpanded();
-        nodesGenerated = ida.GetNodesTouched();
-    }
-
-    std::cout << "Time to finish: " << t.GetElapsedTime() << std::endl;
-    std::cout << "Nodes expanded: " << nodesExpanded << std::endl;
-    std::cout << "Necessary expanded: " << necessaryExpanded << std::endl;
-    std::cout << "Last Bucket Size: " << lastBucketSize << std::endl;
-    std::cout << "Nodes Generated: " << nodesGenerated << std::endl;
-    std::cout << "Max Memory: " << maxMemory << std::endl;
-
-
-    return solutionCost;
-}
-
-MNPuzzleState<4, 4> GetKorfProblem(int num) {
+MNPuzzleState<4, 4> GetStp4Problem(int num) {
     assert(num > -1 && num < 100);
     return STP::GetKorfInstance(num);
 }
 
-int GetKorfSolutionCost(int num) {
+int GetStp4Solution(int num) {
     assert(num > -1 && num < 100);
     return KORF_OPTIMAL_SOLUTIONS[num];
 }
 
-MNPuzzleState<5, 5> GetArielProblem(int num) {
+MNPuzzleState<5, 5> GetStp5Problem(int num) {
     assert(num > -1 && num < 50);
     MNPuzzleState<5, 5> state;
     for (int i = 0; i < state.puzzle.size(); i++) {
@@ -311,392 +110,408 @@ MNPuzzleState<5, 5> GetArielProblem(int num) {
     return state;
 }
 
-int GetArielSolutionCost(int num) {
+int GetStp5Solution(int num) {
     assert(num > -1 && num < 50);
     return ARIEL_OPTIMAL_SOLUTIONS[num];
 }
 
-
-EMBHS::Verbosity GetVerbosity(const std::string &arg) {
-    if (arg == "d" || arg == "debug")
-        return EMBHS::lDebug;
-    if (arg == "i" || arg == "info")
-        return EMBHS::lInfo;
-    if (arg == "w" || arg == "warn")
-        return EMBHS::lWarn;
-    if (arg == "e" || arg == "error")
-        return EMBHS::lError;
-    if (arg == "c" || arg == "critical")
-        return EMBHS::lCritical;
-    std::cerr << "Unknown verbosity level" << std::endl;
-    exit(-1);
+void PrintHelp() {
+    std::cout << "USAGE:\n";
+    std::cout << "  program [OPTIONS]\n\n";
+    std::cout << "OPTIONS:\n";
+    std::cout << "  --domain <DOMAIN>           Specify the domain [STP4, STP5, TOH].\n";
+    std::cout << "  --heuristic <HEURISTIC>     Set the heuristic method to use.\n";
+    std::cout << "  --algorithm <ALG1,ALG2,...> List the algorithms to be used, separated by spaces.\n";
+    std::cout << "  --instance <ID>             Set the starting instance ID (non-negative).\n";
+    std::cout << "  --num-instances <N>         Number of instances to process (default: 1).\n";
+    std::cout << "  --verbosity <LEVEL>         Set verbosity level:\n";
+    std::cout << "                                d | debug     (10)\n";
+    std::cout << "                                i | info      (20)\n";
+    std::cout << "                                w | warn      (30)\n";
+    std::cout << "                                e | error     (40)\n";
+    std::cout << "                                c | critical  (50)\n";
+    std::cout << "  --pdb-dir <DIR>       Directory for pattern databases.\n";
+    std::cout << "  --temp-dir <DIR>      Directory for temporary files.\n";
+    std::cout << "  --threads-expansion <N>     Set number of threads for expansion (default: hardware concurrency).\n";
+    std::cout << "  --threads-reading <N>       Set number of threads for reading (default: hardware concurrency).\n";
+    std::cout << "\nEXAMPLES:\n";
+    std::cout << "  program --domain STP4 --heuristic MD --algorithm alg1 alg2 --instance 10 \\\n";
+    std::cout << "          --num-instances 5 --verbosity info --threads-expansion 4\n";
+    std::cout << "\nNOTES:\n";
+    std::cout << "  - If using domain STP4, ensure (instance ID + num instances) <= 100.\n";
+    std::cout << "  - For STP5, ensure (instance ID + num instances) <= 50.\n";
+    std::cout << "  - Default verbosity is 'warn' if not specified.\n";
+    std::cout << "  - Check hardware concurrency to determine default thread counts.\n";
+    std::cout << "\n";
 }
 
-void RunKorfInstance(int num, EMBHS::Verbosity verbosity, const std::string &algorithm, const std::string &pdb_prefix,
-                     const std::string &pebae_prefix, int numThreadsPdb, int numThreadsExpansion,
-                     int numThreadsReading) {
-    MNPuzzleState<4, 4> start = GetKorfProblem(num);
-    MNPuzzleState<4, 4> goal;
-    goal.Reset();
-
-    Heuristic<MNPuzzleState<4, 4>> *h2Forward = nullptr;
-    Heuristic<MNPuzzleState<4, 4>> *h2Backward = nullptr;
-
-    if (!pdb_prefix.empty()) {
-        h2Forward = EMBHS::GenerateStpPDB(goal, pdb_prefix, numThreadsPdb);
-        h2Backward = EMBHS::GenerateStpPDB(start, pdb_prefix, numThreadsPdb);
+bool ParseArguments(EMBHS::ArgParameters &ap, const std::vector<std::string> &args) {
+    if (args.size() == 1) {
+        PrintHelp();
+        return false;
     }
-    int sc = RUN_PROBLEM_STP(4)(start, goal, h2Forward, h2Backward, verbosity, algorithm, pebae_prefix,
-                                numThreadsExpansion, numThreadsReading);
 
-    std::cout << "SC: " << sc << " TC: " << GetKorfSolutionCost(num) << std::endl;
-    assert(sc == GetKorfSolutionCost(num));
-    if (!pdb_prefix.empty()) {
-        EMBHS::DeletePDB(h2Forward);
-        EMBHS::DeletePDB(h2Backward);
+    for (int i = 1; i < args.size(); ++i) {
+        if (args[i] == "-v" || args[i] == "--verbose") {
+            ++i;
+            ap.SetVerbosity(args[i]);
+        } else if (args[i] == "-d" || args[i] == "--domain") {
+            ++i;
+            ap.domain = args[i];
+        } else if (args[i] == "-a" || args[i] == "--algorithm") {
+            do {
+                ++i;
+                ap.algs.push_back(args[i]);
+            } while (i + 1 < args.size() && args[i + 1][0] != '-');
+        } else if (args[i] == "-i" || args[i] == "--instance") {
+            ++i;
+            ap.instanceId = std::stoi(args[i]);
+
+        } else if (args[i] == "-n" || args[i] == "--number") {
+            ++i;
+            ap.numOfInstances = std::stoi(args[i]);
+        } else if (args[i] == "-t" || args[i] == "--temp-dir") {
+            ++i;
+            ap.tempDir = args[i];
+            if (ap.tempDir.back() != '/') {
+                ap.tempDir += '/';
+            }
+        } else if (args[i] == "-p" || args[i] == "--pdb-dir") {
+            ++i;
+            ap.pdbDir = args[i];
+            if (ap.pdbDir.back() != '/') {
+                ap.pdbDir += '/';
+            }
+        } else if (args[i] == "-e" || args[i] == "--expansion-threads") {
+            ++i;
+            ap.numThreadsExpansion = std::stoi(args[i]);
+        } else if (args[i] == "-r" || args[i] == "--reading-threads") {
+            ++i;
+            ap.numThreadsReading = std::stoi(args[i]);
+        } else if (args[i] == "-h" || args[i] == "--heuristic") {
+            ++i;
+            ap.heuristic = args[i];
+        } else if (args[i] == "--help") {
+            PrintHelp();
+            return false;
+        } else {
+            std::cerr << "Unknown argument: " << args[i] << std::endl;
+            return false;
+        }
     }
+    return true;
 }
 
-void RunArielInstance(int num, EMBHS::Verbosity verbosity, const std::string &algorithm, const std::string &pdb_prefix,
-                      const std::string &pebae_prefix, int numThreadsPdb, int numThreadsExpansion,
-                      int numThreadsReading) {
-    MNPuzzleState<5, 5> start = GetArielProblem(num);
-    MNPuzzleState<5, 5> goal;
-    goal.Reset();
-    Heuristic<MNPuzzleState<5, 5>> *h2Forward = nullptr;
-    Heuristic<MNPuzzleState<5, 5>> *h2Backward = nullptr;
-    if (!pdb_prefix.empty()) {
-        h2Forward = EMBHS::GenerateStpPDB(goal, pdb_prefix, numThreadsPdb);
-        h2Backward = EMBHS::GenerateStpPDB(start, pdb_prefix, numThreadsPdb);
+void HandleTempDir(const std::string &tempDir) {
+    if (tempDir.empty()) {
+        std::cerr << "Temp dir is not set despite using a PEM algorithm" << std::endl;
+        exit(-1);
     }
-    int sc = RUN_PROBLEM_STP(5)(start, goal, h2Forward, h2Backward, verbosity, algorithm, pebae_prefix,
-                                numThreadsExpansion, numThreadsReading);
-
-    std::cout << "SC: " << sc << " TC: " << GetArielSolutionCost(num) << std::endl;
-    assert(sc == GetArielSolutionCost(num));
-    if (!pdb_prefix.empty()) {
-        EMBHS::DeletePDB(h2Forward);
-        EMBHS::DeletePDB(h2Backward);
-    }
-}
-
-
-// This is a helper function that creates a 4X4 state given its tiles in a line seperated by spaces
-template<int N>
-void GetInstanceFromString(MNPuzzleState<N, N> &state, const std::string &str) {
-    std::istringstream is(str);
-    int n;
-    int i = 0;
-    while (is >> n) {
-        state.puzzle[i] = n;
-        if (n == 0)
-            state.blank = i;
-        i++;
-    }
-}
-
-// This is a helper function to run the 5X5 puzzles with the PDBs with reflection.
-// This was created out of laziness instead of probably redesigning the experiment call
-void RunStp5(int ariel_instance, std::string &algoritm, const std::string &pebae_prefix,
-             const std::string &pdb_prefix,
-             uint64_t numThreadsExpansion = std::thread::hardware_concurrency(),
-             uint64_t numThreadsReading = std::thread::hardware_concurrency()) {
-    MNPuzzleState<5, 5> start = GetArielProblem(ariel_instance);
-    MNPuzzleState<5, 5> goal;
-    Heuristic<MNPuzzleState<5, 5>> *hForward = nullptr;
-    Heuristic<MNPuzzleState<5, 5>> *hBackward = nullptr;
-    if (algoritm == "PIDA" || algoritm == "PEBAE") {
-        hForward = new EMBHS::CanonicalReflectionPDB5(EMBHS::GenerateStpPDB(goal, pdb_prefix, -1));
+    struct stat info{};
+    if (stat(tempDir.c_str(), &info) == 0) {
+        // If dir does not contain any subdirectories (as that means it might not be the
+        // correct directory, or it contains data it should not), and only then delete it.
+        if (system(("[ -z \"$(find " + tempDir + " -mindepth 1 -type d)\" ] && rm -r " + tempDir).c_str())) {
+            std::cerr << "Temp dir file deletion failed" << std::endl;
+            exit(-1);
+        }
     }
 
-    if (algoritm == "RPIDA" || algoritm == "PEBAE") {
-        hBackward = EMBHS::GenerateStpDoublePDB(start, pdb_prefix);
-    }
-
-    int solutionCost = -1;
-    uint64_t nodesExpanded = 0;
-    uint64_t necessaryExpanded = 0;
-    uint64_t lastBucketSize = 0;
-    uint64_t nodesGenerated = 0;
-    uint64_t maxMemory = 0;
-    MNPuzzle<5, 5> env;
-    Timer t;
-
-    if (algoritm == "PIDA") {
-        ParallelIDAStar<MNPuzzle<5, 5>, MNPuzzleState<5, 5>, slideDir> ida;
-        std::vector<slideDir> actionSolutionPath;
-        ida.SetHeuristic(hForward);
-        ida.SetStopAfterSolution(true);
-        t.StartTimer();
-        ida.GetPath(&env, start, goal, actionSolutionPath, numThreadsExpansion);
-        t.EndTimer();
-
-        //Since STP is a unit-cost domain, the path length is the number of actions taken
-        solutionCost = (int) actionSolutionPath.size();
-        nodesExpanded = ida.GetNodesExpanded();
-        necessaryExpanded = ida.GetNecessaryExpanded();
-        nodesGenerated = ida.GetNodesTouched();
-    } else if (algoritm == "RPIDA") {
-        ParallelIDAStar<MNPuzzle<5, 5>, MNPuzzleState<5, 5>, slideDir> ida;
-        std::vector<slideDir> actionSolutionPath;
-        ida.SetHeuristic(hBackward);
-        ida.SetStopAfterSolution(true);
-        t.StartTimer();
-        ida.GetPath(&env, goal, start, actionSolutionPath, numThreadsExpansion);
-        t.EndTimer();
-
-        //Since STP is a unit-cost domain, the path length is the number of actions taken
-        solutionCost = (int) actionSolutionPath.size();
-        nodesExpanded = ida.GetNodesExpanded();
-        necessaryExpanded = ida.GetNecessaryExpanded();
-        nodesGenerated = ida.GetNodesTouched();
-    } else if (algoritm == "PEBAE") {
-        // Clear and make the directory to store all the PE-BAE* files
-        system(("rm -rf " + pebae_prefix).c_str());
-        system(("mkdir " + pebae_prefix).c_str());
-        EMBHS::PEBAE::PEBAE<MNPuzzleState<5, 5>, slideDir, MNPuzzle<5, 5>, EMBHS::STPHash<5>> pebae(pebae_prefix,
-                                                                                                    EMBHS::lInfo,
-                                                                                                    (int) numThreadsExpansion,
-                                                                                                    (int) numThreadsReading);
-        pebae.SetHeuristics(hForward, hBackward);
-
-        t.StartTimer();
-        pebae.GetPath(start, goal);
-        t.EndTimer();
-
-        solutionCost = pebae.GetPathLength();
-        nodesExpanded = pebae.GetNodesExpanded();
-        necessaryExpanded = pebae.GetNecessaryExpanded();
-        lastBucketSize = pebae.GetLastBucketSize();
-        nodesGenerated = pebae.GetNodesGenerated();
-        maxMemory = pebae.GetMaxMemory();
-    } else {
-        std::cerr << "Unknown algorithm" << std::endl;
+    if (system(("mkdir -p " + tempDir).c_str())) {
+        std::cerr << "Temp dir creation failed" << std::endl;
         exit(-1);
     }
 
-    std::cout << "Time to finish: " << t.GetElapsedTime() << std::endl;
-    std::cout << "Nodes expanded: " << nodesExpanded << std::endl;
-    std::cout << "Necessary expanded: " << necessaryExpanded << std::endl;
-    std::cout << "Last Bucket Size: " << lastBucketSize << std::endl;
-    std::cout << "Nodes Generated: " << nodesGenerated << std::endl;
-    std::cout << "Max Memory: " << maxMemory << std::endl;
-    std::cout << "SC: " << solutionCost << std::endl;
-
-    if (algoritm == "PIDA" || algoritm == "PEBAE") {
-        delete hForward;
-    }
-
-    if (algoritm == "RPIDA" || algoritm == "PEBAE") {
-        for (auto &temp: hBackward->heuristics)
-            delete temp;
-        delete hBackward;
-    }
-
-    assert(solutionCost == GetArielSolutionCost(ariel_instance));
 }
 
+template<class Tstate, class Taction, class Tenvironment, class Thash>
+void RunProblem(Tstate start, Tstate goal, Heuristic<Tstate> *hForward, Heuristic<Tstate> *hBackward,
+                const EMBHS::ArgParameters &ap) {
+    Timer timer;
+    std::vector<Tstate> solutionPath;
+    std::vector<Taction> actionSolutionPath;
+    Tenvironment env;
 
-template<int N, int T, int B = N - T>
-void RunTemplatedToh(int num, EMBHS::Verbosity verbosity, const std::string &algorithm, const std::string &pdb_prefix,
-                     const std::string &pebae_prefix, int numThreadsPdb, int numThreadsExpansion,
-                     int numThreadsReading) {
-    TOH<N> toh;
-    TOHState<N> start;
-    TOHState<N> goal;
+    if (ap.HasAlgorithm("BAE")) {
+        std::cout << "[A] alg: BAE*; threads: 1\n";
+        EMBHS::BAE::BAE<Tstate, Taction, Tenvironment> bae;
+        timer.StartTimer();
+        bae.GetPath(&env, start, goal, hForward, hBackward, solutionPath);
+        timer.EndTimer();
+        printf("[R] solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.2f\n",
+               env.GetPathLength(solutionPath), bae.GetNodesExpanded(),
+               bae.GetNodesTouched(), timer.GetElapsedTime());
+    }
+
+    if (ap.HasAlgorithm("A")) {
+        std::cout << "[A] alg: A*; threads: 1\n";
+        TemplateAStar<Tstate, Taction, Tenvironment> astar;
+        astar.SetHeuristic(hForward);
+        timer.StartTimer();
+        astar.GetPath(&env, start, goal, solutionPath);
+        timer.EndTimer();
+        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.2f\n", "A*",
+               env.GetPathLength(solutionPath), astar.GetNodesExpanded(),
+               astar.GetNodesTouched(), timer.GetElapsedTime());
+    }
+
+    if (ap.HasAlgorithm("RA")) {
+        std::cout << "[A] alg: RA*; threads: 1\n";
+        TemplateAStar<Tstate, Taction, Tenvironment> astar;
+        astar.SetHeuristic(hBackward);
+        timer.StartTimer();
+        astar.GetPath(&env, goal, start, solutionPath);
+        timer.EndTimer();
+        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.2f\n", "RA*",
+               env.GetPathLength(solutionPath), astar.GetNodesExpanded(),
+               astar.GetNodesTouched(), timer.GetElapsedTime());
+    }
+
+    if (ap.HasAlgorithm("IDA")) {
+        std::cout << "[A] alg: IDA*; threads: 1\n";
+        IDAStar<Tstate, Taction> idastar;
+        idastar.SetHeuristic(hForward);
+        timer.StartTimer();
+        idastar.GetPath(&env, start, goal, solutionPath);
+        timer.EndTimer();
+        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.2f\n", "IDA*",
+               env.GetPathLength(solutionPath), idastar.GetNodesExpanded(),
+               idastar.GetNodesTouched(), timer.GetElapsedTime());
+    }
+
+    if (ap.HasAlgorithm("RIDA")) {
+        std::cout << "[A] alg: RIDA*; threads: 1\n";
+        IDAStar<Tstate, Taction> idastar;
+        idastar.SetHeuristic(hBackward);
+        timer.StartTimer();
+        idastar.GetPath(&env, goal, start, solutionPath);
+        timer.EndTimer();
+        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.2f\n", "RIDA*",
+               env.GetPathLength(solutionPath), idastar.GetNodesExpanded(),
+               idastar.GetNodesTouched(), timer.GetElapsedTime());
+    }
+
+    if (ap.HasAlgorithm("AIDA")) {
+        std::cout << "[A] alg: AIDA*; threads: " << ap.numThreadsExpansion << "\n";
+        ParallelIDAStar<Tenvironment, Tstate, Taction> aida;
+        aida.SetHeuristic(hForward);
+        timer.StartTimer();
+        aida.GetPath(&env, start, goal, actionSolutionPath, ap.numThreadsExpansion);
+        timer.EndTimer();
+        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.2f\n", "AIDA*",
+               env.GetPathLength(start, actionSolutionPath), aida.GetNodesExpanded(),
+               aida.GetNodesTouched(), timer.GetElapsedTime());
+    }
+
+    if (ap.HasAlgorithm("RAIDA")) {
+        std::cout << "[A] alg: RAIDA*; threads: " << ap.numThreadsExpansion << "\n";
+        ParallelIDAStar<Tenvironment, Tstate, Taction> aida;
+        aida.SetHeuristic(hBackward);
+        timer.StartTimer();
+        aida.GetPath(&env, goal, start, actionSolutionPath, ap.numThreadsExpansion);
+        timer.EndTimer();
+        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.2f\n", "RAIDA*",
+               env.GetPathLength(goal, actionSolutionPath), aida.GetNodesExpanded(),
+               aida.GetNodesTouched(), timer.GetElapsedTime());
+    }
+
+    if (ap.HasAlgorithm("PEMBAE")) {
+        std::cout << "[A] alg: PEM-BAE*; threads: " << ap.numThreadsExpansion << "\n";
+        HandleTempDir(ap.tempDir);
+        EMBHS::PEBAE::PEBAE<Tstate, Taction, Tenvironment, Thash> pembae(ap.tempDir, ap.verbosity,
+                                                                         ap.numThreadsExpansion,
+                                                                         ap.numThreadsReading);
+        pembae.SetHeuristics(hForward, hBackward);
+        timer.StartTimer();
+        pembae.GetPath(start, goal);
+        timer.EndTimer();
+        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.2f\n", "PEM-BAE*",
+               (double) pembae.GetPathLength(), pembae.GetNodesExpanded(),
+               pembae.GetNodesGenerated(), timer.GetElapsedTime());
+    }
+
+    if (ap.HasAlgorithm("PEMM")) {
+        std::cout << "[A] alg: PEMM*; threads: " << ap.numThreadsExpansion << "\n";
+        HandleTempDir(ap.tempDir);
+        EMBHS::PEMM::PEMM<Tstate, Taction, Tenvironment, Thash> pemm(ap.tempDir, ap.verbosity);
+        pemm.SetHeuristics(hForward, hBackward);
+        timer.StartTimer();
+        pemm.GetPath(start, goal);
+        timer.EndTimer();
+        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.2f\n", "PEM-BAE*",
+               (double) pemm.GetPathLength(), pemm.GetNodesExpanded(),
+               pemm.GetNodesGenerated(), timer.GetElapsedTime());
+    }
+    if (ap.HasAlgorithm("PEMA")) {
+        std::cout << "[A] alg: PEM-A*; threads: " << ap.numThreadsExpansion << "\n";
+        HandleTempDir(ap.tempDir);
+        EMBHS::PEMASTAR::PEMASTAR<Tstate, Taction, Tenvironment, Thash> pemastar(ap.tempDir, ap.verbosity);
+        pemastar.SetHeuristics(hForward);
+
+        timer.StartTimer();
+        pemastar.GetPath(start, goal);
+        timer.EndTimer();
+
+        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.2f\n", "PEM-A*",
+               (double) pemastar.GetPathLength(), pemastar.GetNodesExpanded(),
+               pemastar.GetNodesGenerated(), timer.GetElapsedTime());
+    }
+
+    if (ap.HasAlgorithm("RPEMA")) {
+        std::cout << "[A] alg: PEM-RA*; threads: " << ap.numThreadsExpansion << "\n";
+        HandleTempDir(ap.tempDir);
+        EMBHS::PEMASTAR::PEMASTAR<Tstate, Taction, Tenvironment, Thash> pemastar(ap.tempDir, ap.verbosity);
+        pemastar.SetHeuristics(hBackward);
+
+        timer.StartTimer();
+        pemastar.GetPath(goal, start);
+        timer.EndTimer();
+
+        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.2f\n", "PEM-RA*",
+               (double) pemastar.GetPathLength(), pemastar.GetNodesExpanded(),
+               pemastar.GetNodesGenerated(), timer.GetElapsedTime());
+    }
+}
+
+void RunToh(EMBHS::ArgParameters &ap) {
+    std::cout << "[D] domain: TOH; heuristic: PDB-" + ap.heuristic << std::endl;
+    TOH<20> toh;
+    TOHState<20> start;
+    TOHState<20> goal;
 
     int table[] = {52058078, 116173544, 208694125, 131936966, 141559500, 133800745, 194246206, 50028346, 167007978,
                    207116816, 163867037, 119897198, 201847476, 210859515, 117688410, 121633885};
     int table2[] = {145008714, 165971878, 154717942, 218927374, 182772845, 5808407, 19155194, 137438954, 13143598,
                     124513215, 132635260, 39667704, 2462244, 41006424, 214146208, 54305743};
 
-    srandom(table[num & 0xF] ^ table2[(num >> 4) & 0xF]);
+    for (int i = ap.instanceId; i < ap.instanceId + ap.numOfInstances; ++i) {
+        srandom(table[i & 0xF] ^ table2[(i >> 4) & 0xF]);
 
-    start.counts[0] = start.counts[1] = start.counts[2] = start.counts[3] = 0;
-    for (int x = N; x > 0; x--) {
-        int whichPeg = random() % 4;
-        start.disks[whichPeg][start.counts[whichPeg]] = x;
-        start.counts[whichPeg]++;
+        start.counts[0] = start.counts[1] = start.counts[2] = start.counts[3] = 0;
+        for (int x = 20; x > 0; x--) {
+            int whichPeg = random() % 4;
+            start.disks[whichPeg][start.counts[whichPeg]] = x;
+            start.counts[whichPeg]++;
+        }
+
+        goal.counts[0] = goal.counts[1] = goal.counts[2] = goal.counts[3] = 0;
+        for (int x = 20; x > 0; x--) {
+            int whichPeg = random() % 4;
+            goal.disks[whichPeg][goal.counts[whichPeg]] = x;
+            goal.counts[whichPeg]++;
+        }
+
+        std::cout << "[I] instance_id: " << i << "; instance_str: " << start << " " << goal << std::endl;
+        Heuristic<TOHState<20>> *hForward;
+        Heuristic<TOHState<20>> *hBackward;
+
+        switch (std::stoi(ap.heuristic)) {
+            case 4:
+                hForward = EMBHS::BuildTohPDB<20, 4>(ap.pdbDir, goal);
+                hBackward = EMBHS::BuildTohPDB<20, 4>(ap.pdbDir, start);
+                break;
+            default:
+                std::cerr << "Unavailable TOH Top PDB size" << std::endl;
+                exit(-1);
+        }
+        RunProblem<TOHState<20>, TOHMove, TOH<20>, EMBHS::TOHHash<20>>
+                (start, goal, hForward, hBackward, ap);
+        EMBHS::DeletePDB(hForward);
+        EMBHS::DeletePDB(hBackward);
+    }
+}
+
+void RunStp4(EMBHS::ArgParameters &ap) {
+    std::cout << "[D] domain: STP4; heuristic: " + ap.heuristic << std::endl;
+    MNPuzzle<4, 4> env;
+    MNPuzzleState<4, 4> goal;
+    goal.Reset();
+
+    Heuristic<MNPuzzleState<4, 4>> *fHeuristic;
+    Heuristic<MNPuzzleState<4, 4>> *bHeuristic;
+    Timer timer;
+    std::vector<MNPuzzleState<4, 4>> solutionPath;
+
+    if (ap.heuristic == "4+4+4+4") {
+        fHeuristic = EMBHS::GenerateStpPDB(goal, ap.pdbDir, (int) std::thread::hardware_concurrency());
+    } else if (ap.heuristic == "MD") {
+        fHeuristic = &env;
+        bHeuristic = &env;
+    } else {
+        std::cerr << "Unknown STP4 heuristic: " + ap.heuristic << std::endl;
+        exit(-1);
     }
 
-    goal.counts[0] = goal.counts[1] = goal.counts[2] = goal.counts[3] = 0;
-    for (int x = N; x > 0; x--) {
-        int whichPeg = random() % 4;
-        goal.disks[whichPeg][goal.counts[whichPeg]] = x;
-        goal.counts[whichPeg]++;
+    for (int i = ap.instanceId; i < ap.instanceId + ap.numOfInstances; ++i) {
+        MNPuzzleState<4, 4> start = GetStp4Problem(i);
+        std::cout << "[I] instance_id: " << i << "; instance_str: " << start << std::endl;
+        if (ap.heuristic == "4+4+4+4") {
+            bHeuristic = EMBHS::GenerateStpPDB(start, ap.pdbDir, (int) std::thread::hardware_concurrency());
+        }
+
+        RUN_PROBLEM_STP(4)(start, goal, fHeuristic, bHeuristic, ap);
+
+
+        if (ap.heuristic == "4+4+4+4") {
+            EMBHS::DeletePDB(bHeuristic);
+        }
     }
 
-    std::cout << "Start: " << start << std::endl;
-    std::cout << "Goal: " << goal << std::endl;
+    if (ap.heuristic == "4+4+4+4") {
+        EMBHS::DeletePDB(fHeuristic);
+    }
+}
 
-    Heuristic<TOHState<N>> *hForward = EMBHS::BuildTohPDB<N, 4>(pdb_prefix, goal);
-    Heuristic<TOHState<N>> *hBackward = EMBHS::BuildTohPDB<N, 4>(pdb_prefix, start);
+void RunStp5(EMBHS::ArgParameters &ap) {
+    std::cout << "[D] domain: STP5; heuristic: 6+6+6+6" << std::endl;
+    MNPuzzleState<5, 5> goal;
+    Heuristic<MNPuzzleState<5, 5>> *hForward = nullptr;
+    if (ap.HasAlgorithm("AIDA") || ap.HasAlgorithm("PEMBAE")) {
+        hForward = new EMBHS::CanonicalReflectionPDB5(
+                EMBHS::GenerateStpPDB(goal, ap.pdbDir, (int) std::thread::hardware_concurrency()));
+    }
+    Heuristic<MNPuzzleState<5, 5>> *hBackward = nullptr;
+    for (int i = ap.instanceId; i < ap.instanceId + ap.numOfInstances; ++i) {
+        MNPuzzleState<5, 5> start = GetStp5Problem(i);
+        if (ap.HasAlgorithm("RAIDA") || ap.HasAlgorithm("PEMBAE")) {
+            hBackward = EMBHS::GenerateStpDoublePDB(start, ap.pdbDir, (int) std::thread::hardware_concurrency());
+        }
+        RUN_PROBLEM_STP(5)(start, goal, hForward, hBackward, ap);
+        if (hBackward != nullptr) {
+            for (auto &temp: hBackward->heuristics)
+                delete temp;
+            delete hBackward;
+        }
+    }
 
-    int sc = RunProblem<TOHState<N>, TOHMove, TOH<N>, EMBHS::TOHHash<N>>(start, goal, hForward, hBackward, verbosity,
-                                                                         algorithm, pebae_prefix, numThreadsExpansion,
-                                                                         numThreadsReading);
-    std::cout << "SC: " << sc << std::endl;
+    delete hForward;
+
 }
 
 int main(int argc, char *argv[]) {
     std::cout.setf(std::ios_base::fixed, std::ios_base::floatfield);
     std::cout << std::setprecision(3);
-    // This is a list of the supported algorithms
-    const std::vector<std::string> ALGORITHMS = {"BAE", "A", "RA", "IDA", "RIDA",
-                                                 "PEBAE", "PEMM", "PEMASTAR", "RPEMASTAR", "PIDA", "RPIDA"};
+
     std::vector<std::string> args(argv, argv + argc);
-    EMBHS::Verbosity verbosity = EMBHS::lInfo;
-    int korf_instance = -1;
-    int ariel_instance = -1;
-    std::string algorithm = "PEBAE";
-    std::string pdb_path;
-    std::string pebae_path = "pebae_files/";
-    bool stp = false;
-    int toh_instance = -2;
-    int toh_num_disks = -1;
-    int toh_top_pdb_size = -1;
-
-    // Before defaulting to this, make sure that max_threads in PDB is smaller than this, otherwise there will be
-    // concurrency issues
-    int numThreadsPdb = (int) std::thread::hardware_concurrency();
-
-    int numThreadsExpansion = (int) std::thread::hardware_concurrency();
-    int numThreadsReading = (int) std::thread::hardware_concurrency();
-
-    for (int i = 1; i < args.size(); i++) {
-        // Verbosity of algorithms. Generally warn or higher is silent, info gives progress information about the
-        // algorithm, and debug is for debugging purposes.
-        if (args[i] == "-v" || args[i] == "--verbose") {
-            i++;
-            verbosity = GetVerbosity(args[i]);
-        }
-            // 100 4X4 instances. Here instances begin at 0 (and not 1 like the paper)
-        else if (args[i] == "-k" || args[i] == "--korf") {
-            i++;
-            korf_instance = std::stoi(args[i]);
-        }
-            // 50 5X5 instances. Here instances begin at 0 (and not 1 like the paper)
-        else if (args[i] == "-a" || args[i] == "--ariel") {
-            i++;
-            ariel_instance = std::stoi(args[i]);
-        }
-            // If pdb is set, the algorithm will use PDB instead of the environment's builtin heuristic
-        else if (args[i] == "-p" || args[i] == "--pdb") {
-            i++;
-            pdb_path = args[i];
-        }
-            // Algorithm name
-        else if (args[i] == "-al" || args[i] == "--algorithm") {
-            i++;
-            algorithm = args[i];
-        }
-            // This is the prefix for where to store the PEBAE files in case the chosen algorithm is PEBAE
-        else if (args[i] == "-pe" || args[i] == "--pebae") {
-            i++;
-            pebae_path = args[i];
-            if (pebae_path.back() != '/' && pebae_path[0] != 0)
-                pebae_path += '/';
-        }
-            // Number of threads to create the PDB.
-        else if (args[i] == "-tp" || args[i] == "--tpdb") {
-            i++;
-            numThreadsPdb = stoi(args[i]);
-            // Number of threads to read files into memory.
-        } else if (args[i] == "-te" || args[i] == "--texpansion") {
-            i++;
-            numThreadsExpansion = stoi(args[i]);
-            // Number of threads to expand buckets
-        } else if (args[i] == "-tr" || args[i] == "--treading") {
-            i++;
-            numThreadsReading = stoi(args[i]);
-        } else if (args[i] == "--stp") {
-            stp = true;
-        } else if (args[i] == "--toh") {
-            i++;
-            toh_num_disks = std::stoi(args[i]);
-            i++;
-            toh_top_pdb_size = std::stoi(args[i]);
-            i++;
-            toh_instance = std::stoi(args[i]);
-        } else {
-            std::cerr << "Unhandled argument" << std::endl;
-            exit(-1);
-        }
-    }
-
-    if (toh_instance > -2) {
-        if (toh_num_disks <= 0 || toh_top_pdb_size <= 0) {
-            std::cerr << "ToH wrong arguments, need '--toh [numDisks] [topPdbSize] [instance]'" << std::endl;
-            exit(-1);
-        }
-        if (toh_num_disks == 20) {
-            if (toh_top_pdb_size == 5) {
-                RunTemplatedToh<20, 5>(toh_instance, verbosity, algorithm, pdb_path, pebae_path, numThreadsPdb,
-                                       numThreadsExpansion, numThreadsReading);
-                return 0;
-            } else if (toh_top_pdb_size == 4) {
-                RunTemplatedToh<20, 4>(toh_instance, verbosity, algorithm, pdb_path, pebae_path, numThreadsPdb,
-                                       numThreadsExpansion, numThreadsReading);
-                return 0;
-            } else {
-                std::cerr << "Unhandled ToH PDB size" << std::endl;
-                exit(-1);
-            }
-        } else if (toh_num_disks == 18) {
-            if (toh_top_pdb_size == 4) {
-                RunTemplatedToh<18, 4>(toh_instance, verbosity, algorithm, pdb_path, pebae_path, numThreadsPdb,
-                                       numThreadsExpansion, numThreadsReading);
-                return 0;
-            } else if (toh_top_pdb_size == 3) {
-                RunTemplatedToh<18, 3>(toh_instance, verbosity, algorithm, pdb_path, pebae_path, numThreadsPdb,
-                                       numThreadsExpansion, numThreadsReading);
-                return 0;
-            } else {
-                std::cerr << "Unhandled ToH PDB size" << std::endl;
-                exit(-1);
-            }
-        } else if (toh_num_disks == 12) {
-            if (toh_top_pdb_size == 2) {
-                RunTemplatedToh<12, 2>(toh_instance, verbosity, algorithm, pdb_path, pebae_path, numThreadsPdb,
-                                       numThreadsExpansion, numThreadsReading);
-                return 0;
-            } else {
-                std::cerr << "Unhandled ToH PDB size" << std::endl;
-                exit(-1);
-            }
-        } else {
-            std::cerr << "Unhandled ToH size" << std::endl;
-        }
-    }
-
-    if (stp) {
-        RunStp5(ariel_instance, algorithm, pebae_path, pdb_path, numThreadsExpansion, numThreadsReading);
+    EMBHS::ArgParameters argParameters;
+    if (!ParseArguments(argParameters, args)) {
         return 0;
     }
-
-    if ((!(ariel_instance + 1) + !(korf_instance + 1)) != 1) {
-        std::cerr << ariel_instance << " " << korf_instance << " " << std::endl;
-        std::cerr << "Choose exactly one type of problem" << std::endl;
-        exit(-1);
+    if (!argParameters.IsValid()) {
+        std::cerr << "Command line arguments are not valid, please fix them" << std::endl;
+        std::cerr << argParameters << std::endl;
+        return -1;
     }
 
-    if (std::find(ALGORITHMS.begin(), ALGORITHMS.end(), algorithm) == ALGORITHMS.end()) {
-        std::cerr << "Unknown algorithm" << std::endl;
-        exit(-1);
+    if (argParameters.domain == "STP4") {
+        RunStp4(argParameters);
+    } else if (argParameters.domain == "STP5") {
+        RunStp5(argParameters);
+    } else if (argParameters.domain == "TOH") {
+        RunToh(argParameters);
+    } else {
+        std::cerr << ("Unknown domain: " + argParameters.domain) << std::endl;
+        return -1;
     }
 
-    // Note that in both cases, both the forward and backward PDBs will be loaded, even if the algorithm is unidirectional
-    if (ariel_instance >= 0)
-        RunArielInstance(ariel_instance, verbosity, algorithm, pdb_path, pebae_path, numThreadsPdb,
-                         numThreadsExpansion,
-                         numThreadsReading);
-    else if (korf_instance >= 0)
-        RunKorfInstance(korf_instance, verbosity, algorithm, pdb_path, pebae_path, numThreadsPdb,
-                        numThreadsExpansion,
-                        numThreadsReading);
-    else {
-        std::cerr << "Choose A problem" << std::endl;
-        exit(-1);
-    }
-    return 0;
 }

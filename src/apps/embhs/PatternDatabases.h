@@ -122,18 +122,17 @@ namespace EMBHS {
     // This function generates a heuristic that includes the PDB and its reflection across the main diagonal
     template<int N>
     Heuristic<MNPuzzleState<N, N>> *
-    GenerateStpDoublePDB(MNPuzzleState<N, N> &goal, const std::string &prefix) {
-        // This function assumes that the PDBs exist, and that GeneratePartialStpPDB() will only load them. To make sure
-        // we do not create them and cost ourselves a lot of unnecessary building time, they have -1 threads.
+    GenerateStpDoublePDB(MNPuzzleState<N, N> &goal, const std::string &prefix, int numThreads) {
+        // This function assumes that the PDBs exist, and that GeneratePartialStpPDB() will only load them.
 
         auto *h = new Heuristic<MNPuzzleState<N, N>>();
         h->lookups.resize(0);
         h->lookups.push_back({kMaxNode, 1, 2});
         h->heuristics.resize(0);
         h->lookups.push_back({kLeafNode, 0, 0});
-        h->heuristics.push_back(GenerateStpPDB(goal, prefix.c_str(), -1, false));
+        h->heuristics.push_back(GenerateStpPDB(goal, prefix.c_str(), numThreads, false));
         h->lookups.push_back({kLeafNode, 1, 1});
-        h->heuristics.push_back(GenerateStpPDB(goal, prefix.c_str(), -1, true));
+        h->heuristics.push_back(GenerateStpPDB(goal, prefix.c_str(), numThreads, true));
         return h;
     }
 
