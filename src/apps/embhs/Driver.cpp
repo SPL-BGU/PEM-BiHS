@@ -132,8 +132,8 @@ void PrintHelp() {
     std::cout << "                                c | critical  (50)\n";
     std::cout << "  --pdb-dir <DIR>       Directory for pattern databases.\n";
     std::cout << "  --temp-dir <DIR>      Directory for temporary files.\n";
-    std::cout << "  --threads-expansion <N>     Set number of threads for expansion (default: hardware concurrency).\n";
-    std::cout << "  --threads-reading <N>       Set number of threads for reading (default: hardware concurrency).\n";
+    std::cout << "  --expansion-threads <N>     Set number of threads for expansion (default: hardware concurrency).\n";
+    std::cout << "  --reading-threads <N>       Set number of threads for reading (default: hardware concurrency).\n";
     std::cout << "\nEXAMPLES:\n";
     std::cout << "  program --domain STP4 --heuristic MD --algorithm alg1 alg2 --instance 10 \\\n";
     std::cout << "          --num-instances 5 --verbosity info --threads-expansion 4\n";
@@ -238,7 +238,7 @@ void RunProblem(Tstate start, Tstate goal, Heuristic<Tstate> *hForward, Heuristi
         timer.StartTimer();
         bae.GetPath(&env, start, goal, hForward, hBackward, solutionPath);
         timer.EndTimer();
-        printf("[R] solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.2f\n",
+        printf("[R] solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.3f\n",
                env.GetPathLength(solutionPath), bae.GetNodesExpanded(),
                bae.GetNodesTouched(), timer.GetElapsedTime());
     }
@@ -250,7 +250,7 @@ void RunProblem(Tstate start, Tstate goal, Heuristic<Tstate> *hForward, Heuristi
         timer.StartTimer();
         astar.GetPath(&env, start, goal, solutionPath);
         timer.EndTimer();
-        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.2f\n", "A*",
+        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.3f\n", "A*",
                env.GetPathLength(solutionPath), astar.GetNodesExpanded(),
                astar.GetNodesTouched(), timer.GetElapsedTime());
     }
@@ -262,7 +262,7 @@ void RunProblem(Tstate start, Tstate goal, Heuristic<Tstate> *hForward, Heuristi
         timer.StartTimer();
         astar.GetPath(&env, goal, start, solutionPath);
         timer.EndTimer();
-        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.2f\n", "RA*",
+        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.3f\n", "RA*",
                env.GetPathLength(solutionPath), astar.GetNodesExpanded(),
                astar.GetNodesTouched(), timer.GetElapsedTime());
     }
@@ -274,7 +274,7 @@ void RunProblem(Tstate start, Tstate goal, Heuristic<Tstate> *hForward, Heuristi
         timer.StartTimer();
         idastar.GetPath(&env, start, goal, solutionPath);
         timer.EndTimer();
-        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.2f\n", "IDA*",
+        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.3f\n", "IDA*",
                env.GetPathLength(solutionPath), idastar.GetNodesExpanded(),
                idastar.GetNodesTouched(), timer.GetElapsedTime());
     }
@@ -286,7 +286,7 @@ void RunProblem(Tstate start, Tstate goal, Heuristic<Tstate> *hForward, Heuristi
         timer.StartTimer();
         idastar.GetPath(&env, goal, start, solutionPath);
         timer.EndTimer();
-        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.2f\n", "RIDA*",
+        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.3f\n", "RIDA*",
                env.GetPathLength(solutionPath), idastar.GetNodesExpanded(),
                idastar.GetNodesTouched(), timer.GetElapsedTime());
     }
@@ -298,7 +298,7 @@ void RunProblem(Tstate start, Tstate goal, Heuristic<Tstate> *hForward, Heuristi
         timer.StartTimer();
         aida.GetPath(&env, start, goal, actionSolutionPath, ap.numThreadsExpansion);
         timer.EndTimer();
-        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.2f\n", "AIDA*",
+        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.3f\n", "AIDA*",
                env.GetPathLength(start, actionSolutionPath), aida.GetNodesExpanded(),
                aida.GetNodesTouched(), timer.GetElapsedTime());
     }
@@ -310,7 +310,7 @@ void RunProblem(Tstate start, Tstate goal, Heuristic<Tstate> *hForward, Heuristi
         timer.StartTimer();
         aida.GetPath(&env, goal, start, actionSolutionPath, ap.numThreadsExpansion);
         timer.EndTimer();
-        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.2f\n", "RAIDA*",
+        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.3f\n", "RAIDA*",
                env.GetPathLength(goal, actionSolutionPath), aida.GetNodesExpanded(),
                aida.GetNodesTouched(), timer.GetElapsedTime());
     }
@@ -325,7 +325,7 @@ void RunProblem(Tstate start, Tstate goal, Heuristic<Tstate> *hForward, Heuristi
         timer.StartTimer();
         pembae.GetPath(start, goal);
         timer.EndTimer();
-        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.2f\n", "PEM-BAE*",
+        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.3f\n", "PEM-BAE*",
                (double) pembae.GetPathLength(), pembae.GetNodesExpanded(),
                pembae.GetNodesGenerated(), timer.GetElapsedTime());
     }
@@ -338,7 +338,7 @@ void RunProblem(Tstate start, Tstate goal, Heuristic<Tstate> *hForward, Heuristi
         timer.StartTimer();
         pemm.GetPath(start, goal);
         timer.EndTimer();
-        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.2f\n", "PEM-BAE*",
+        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.3f\n", "PEM-BAE*",
                (double) pemm.GetPathLength(), pemm.GetNodesExpanded(),
                pemm.GetNodesGenerated(), timer.GetElapsedTime());
     }
@@ -352,7 +352,7 @@ void RunProblem(Tstate start, Tstate goal, Heuristic<Tstate> *hForward, Heuristi
         pemastar.GetPath(start, goal);
         timer.EndTimer();
 
-        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.2f\n", "PEM-A*",
+        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.3f\n", "PEM-A*",
                (double) pemastar.GetPathLength(), pemastar.GetNodesExpanded(),
                pemastar.GetNodesGenerated(), timer.GetElapsedTime());
     }
@@ -367,7 +367,7 @@ void RunProblem(Tstate start, Tstate goal, Heuristic<Tstate> *hForward, Heuristi
         pemastar.GetPath(goal, start);
         timer.EndTimer();
 
-        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.2f\n", "PEM-RA*",
+        printf("[R] alg: %s; solution: %1.0f; expanded: %llu; generated: %llu; elapsed: %1.3f\n", "PEM-RA*",
                (double) pemastar.GetPathLength(), pemastar.GetNodesExpanded(),
                pemastar.GetNodesGenerated(), timer.GetElapsedTime());
     }
