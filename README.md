@@ -59,7 +59,7 @@ The interface to recreate the results was written after the fact, meaning it was
 This means that you might encounter issues with it. If you encounter any issue, find a bug, or need help, feel free to open an issue or contact Lior (the maintainer).
 
 ## Citation and Code Attribution
-The new code for the journal paper can be found in
+The new code for the paper can be found in
 [src/apps/embhs](https://github.com/SPL-BGU/PEM-BiHS/tree/main/src/apps/embhs).<br/>
 As said before, all of these rely on HOG2 which can be found [here](https://github.com/nathansttt/hog2). 
 
